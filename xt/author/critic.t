@@ -5,10 +5,8 @@ use Test2::V0;
 use Perl::Critic;
 use Test2::Tools::PerlCritic;
 
-my $critic = Perl::Critic->new(
-  -profile => 'perlcriticrc',
-);
+my $critic = Perl::Critic->new( -profile => 'perlcriticrc', );
 
-perl_critic_ok ['lib','t'], $critic;
+perl_critic_ok [ 'lib', 't' ], $critic;
 
 done_testing;
