@@ -94,12 +94,10 @@ Perl data structure may be used.  Useful for persisting data
 between callbacks, for example:
 
  IO::Async::Open3::Simple->new(
-   on_start => sub {
-     my($proc) = @_;
+   on_start => sub ($proc, $program, @args) {
      $proc->user({ prefix => '> ' });
    },
-   on_stdout => sub {
-     my($proc, $line) = @_;
+   on_stdout => sub ($proc, $line) {
      my $prefix = $proc->user->{prefix};
      say "$prefix$line";
    },
