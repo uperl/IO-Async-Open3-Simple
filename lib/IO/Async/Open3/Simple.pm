@@ -256,8 +256,8 @@ be out of scope otherwise.
             $stdin_file->autoflush(1);
             $stdin_file->print(
                 ref($stdin) eq 'ARRAY'
-                ? join( "\n", @{$stdin} )
-                : $$stdin
+                ? join( "\n", $stdin->@* )
+                : $stdin->$*
             );
             $stdin_file->seek( 0, 0 );
             $child_stdin = '<&' . fileno($stdin_file);
@@ -279,7 +279,7 @@ be out of scope otherwise.
 
         my $emit = sub ( $ref, $line ) {
             $line =~ s/(\015?\012|\015)$//;
-            ref($ref) eq 'ARRAY' ? ( push @$ref, $line ) : $ref->( $proc, $line );
+            ref($ref) eq 'ARRAY' ? ( push $ref->@*, $line ) : $ref->( $proc, $line );
             return;
         };
 
@@ -310,18 +310,18 @@ be out of scope otherwise.
             my $stream = IO::Async::Stream->new(
                 read_handle => $handle,
                 on_read     => sub ( $, $buffref, $eof ) {
-                    while ( $$buffref =~ s/^(.*?\012)// ) {
+                    while ( $buffref->$* =~ s/^(.*?\012)// ) {
                         $emit->( $self->{$which}, $1 );
                     }
-                    if ( $eof && length $$buffref ) {
-                        my $line = $$buffref;
-                        $$buffref = '';
+                    if ( $eof && length $buffref->$* ) {
+                        my $line = $buffref->$*;
+                        $buffref->$* = '';
                         $emit->( $self->{$which}, $line );
                     }
                     return 0;
                 },
                 on_read_eof => sub ($) {
-                    $$open_ref = 0;
+                    $open_ref->$* = 0;
                     $finish->();
                     return;
                 },
