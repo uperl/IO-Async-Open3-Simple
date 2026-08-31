@@ -24,34 +24,25 @@ package IO::Async::Open3::Simple {
  my $done = $loop->new_future;
 
  my $ipc = IO::Async::Open3::Simple->new(
-   on_start => sub {
-     my $proc = shift;       # isa IO::Async::Open3::Simple::Process
-     my $program = shift;    # string
-     my @args = @_;          # list of arguments
+   on_start => sub ($proc, $program, @args) {
+     # $proc    isa IO::Async::Open3::Simple::Process
+     # $program is a string
+     # @args    is the list of arguments
      say 'child PID: ', $proc->pid;
    },
-   on_stdout => sub {
-     my $proc = shift;       # isa IO::Async::Open3::Simple::Process
-     my $line = shift;       # string
+   on_stdout => sub ($proc, $line) {
      say 'out: ', $line;
    },
-   on_stderr => sub {
-     my $proc = shift;       # isa IO::Async::Open3::Simple::Process
-     my $line = shift;       # string
+   on_stderr => sub ($proc, $line) {
      say 'err: ', $line;
    },
-   on_exit   => sub {
-     my $proc = shift;       # isa IO::Async::Open3::Simple::Process
-     my $exit_value = shift; # integer
-     my $signal = shift;     # integer
+   on_exit => sub ($proc, $exit_value, $signal) {
      say 'exit value: ', $exit_value;
      say 'signal:     ', $signal;
      $done->done;
    },
-   on_error => sub {
-     my $error = shift;      # the exception thrown by IPC::Open3::open3
-     my $program = shift;    # string
-     my @args = @_;          # list of arguments
+   on_error => sub ($error, $program, @args) {
+     # $error is the exception thrown by IPC::Open3::open3
      warn "error: $error";
      $done->done;
    },
@@ -224,8 +215,7 @@ example:
 
  foreach my $i (1..10)
  {
-   $ipc->run($prog, @args, \$stdin, sub {
-     my($proc) = @_;
+   $ipc->run($prog, @args, \$stdin, sub ($proc) {
      $proc->user({ iteration => $i });
    });
  }
@@ -256,8 +246,8 @@ be out of scope otherwise.
             $stdin_file->autoflush(1);
             $stdin_file->print(
                 ref($stdin) eq 'ARRAY'
-                ? join( "\n", @{$stdin} )
-                : $$stdin
+                ? join( "\n", $stdin->@* )
+                : $stdin->$*
             );
             $stdin_file->seek( 0, 0 );
             $child_stdin = '<&' . fileno($stdin_file);
@@ -279,7 +269,7 @@ be out of scope otherwise.
 
         my $emit = sub ( $ref, $line ) {
             $line =~ s/(\015?\012|\015)$//;
-            ref($ref) eq 'ARRAY' ? ( push @$ref, $line ) : $ref->( $proc, $line );
+            ref($ref) eq 'ARRAY' ? ( push $ref->@*, $line ) : $ref->( $proc, $line );
             return;
         };
 
@@ -310,18 +300,18 @@ be out of scope otherwise.
             my $stream = IO::Async::Stream->new(
                 read_handle => $handle,
                 on_read     => sub ( $, $buffref, $eof ) {
-                    while ( $$buffref =~ s/^(.*?\012)// ) {
+                    while ( $buffref->$* =~ s/^(.*?\012)// ) {
                         $emit->( $self->{$which}, $1 );
                     }
-                    if ( $eof && length $$buffref ) {
-                        my $line = $$buffref;
-                        $$buffref = '';
+                    if ( $eof && length $buffref->$* ) {
+                        my $line = $buffref->$*;
+                        $buffref->$* = '';
                         $emit->( $self->{$which}, $line );
                     }
                     return 0;
                 },
                 on_read_eof => sub ($) {
-                    $$open_ref = 0;
+                    $open_ref->$* = 0;
                     $finish->();
                     return;
                 },
@@ -364,7 +354,7 @@ to wait for the process to complete as in this:
 
  my $done = $loop->new_future;
  my $ipc = IO::Async::Open3::Simple->new(
-   on_exit => sub { $done->done },
+   on_exit => sub (@) { $done->done },
  );
  $ipc->run('command_not_found');
  $done->get;
@@ -375,9 +365,8 @@ this situation you might fail the Future in the event of error:
 
  my $done = $loop->new_future;
  my $ipc = IO::Async::Open3::Simple->new(
-   on_exit => sub { $done->done },
-   on_error => sub {
-     my $error = shift;
+   on_exit => sub (@) { $done->done },
+   on_error => sub ($error, @) {
      $done->fail($error);
    },
  );

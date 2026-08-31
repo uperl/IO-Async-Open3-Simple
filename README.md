@@ -13,34 +13,25 @@ my $loop = IO::Async::Loop->new;
 my $done = $loop->new_future;
 
 my $ipc = IO::Async::Open3::Simple->new(
-  on_start => sub {
-    my $proc = shift;       # isa IO::Async::Open3::Simple::Process
-    my $program = shift;    # string
-    my @args = @_;          # list of arguments
+  on_start => sub ($proc, $program, @args) {
+    # $proc    isa IO::Async::Open3::Simple::Process
+    # $program is a string
+    # @args    is the list of arguments
     say 'child PID: ', $proc->pid;
   },
-  on_stdout => sub {
-    my $proc = shift;       # isa IO::Async::Open3::Simple::Process
-    my $line = shift;       # string
+  on_stdout => sub ($proc, $line) {
     say 'out: ', $line;
   },
-  on_stderr => sub {
-    my $proc = shift;       # isa IO::Async::Open3::Simple::Process
-    my $line = shift;       # string
+  on_stderr => sub ($proc, $line) {
     say 'err: ', $line;
   },
-  on_exit   => sub {
-    my $proc = shift;       # isa IO::Async::Open3::Simple::Process
-    my $exit_value = shift; # integer
-    my $signal = shift;     # integer
+  on_exit => sub ($proc, $exit_value, $signal) {
     say 'exit value: ', $exit_value;
     say 'signal:     ', $signal;
     $done->done;
   },
-  on_error => sub {
-    my $error = shift;      # the exception thrown by IPC::Open3::open3
-    my $program = shift;    # string
-    my @args = @_;          # list of arguments
+  on_error => sub ($error, $program, @args) {
+    # $error is the exception thrown by IPC::Open3::open3
     warn "error: $error";
     $done->done;
   },
@@ -195,8 +186,7 @@ example:
 ```perl
 foreach my $i (1..10)
 {
-  $ipc->run($prog, @args, \$stdin, sub {
-    my($proc) = @_;
+  $ipc->run($prog, @args, \$stdin, sub ($proc) {
     $proc->user({ iteration => $i });
   });
 }
@@ -223,7 +213,7 @@ to wait for the process to complete as in this:
 ```perl
 my $done = $loop->new_future;
 my $ipc = IO::Async::Open3::Simple->new(
-  on_exit => sub { $done->done },
+  on_exit => sub (@) { $done->done },
 );
 $ipc->run('command_not_found');
 $done->get;
@@ -236,9 +226,8 @@ this situation you might fail the Future in the event of error:
 ```perl
 my $done = $loop->new_future;
 my $ipc = IO::Async::Open3::Simple->new(
-  on_exit => sub { $done->done },
-  on_error => sub {
-    my $error = shift;
+  on_exit => sub (@) { $done->done },
+  on_error => sub ($error, @) {
     $done->fail($error);
   },
 );
